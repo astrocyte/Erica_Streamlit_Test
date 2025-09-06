@@ -1243,7 +1243,7 @@ def main():
                 key="file_uploader"
             )
             if uploaded_files:
-                st.session_state.uploaded_files_info = [process_streamlit_file(f) for f in uploaded_files]
+                st.session_state.uploaded_files_info = uploaded_files
                 st.success(f"{len(uploaded_files)} file(s) ready for analysis.")
 
         with st.container(border=True):
