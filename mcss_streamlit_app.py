@@ -369,8 +369,26 @@ def monte_carlo_subsampling(samples_array: np.ndarray,
     log_progress("Starting Monte Carlo subsampling")
     subsamples_data_folder = os.path.join(base_save_folder_str, f'{iter_prefix}subsamples_data')
     indices_folder = os.path.join(base_save_folder_str, f'{iter_prefix}indices')
-    os.makedirs(subsamples_data_folder, exist_ok=True)
-    os.makedirs(indices_folder, exist_ok=True)
+    
+    # Create directories and handle permission issues
+    import stat
+    try:
+        os.makedirs(subsamples_data_folder, exist_ok=True)
+        os.makedirs(indices_folder, exist_ok=True)
+        
+        # If directories exist, try to clean up any existing files with permission issues
+        if os.path.exists(subsamples_data_folder):
+            for existing_file in os.listdir(subsamples_data_folder):
+                file_path = os.path.join(subsamples_data_folder, existing_file)
+                try:
+                    if os.path.isfile(file_path):
+                        os.chmod(file_path, stat.S_IWRITE | stat.S_IREAD)
+                        os.remove(file_path)
+                except (OSError, PermissionError) as e:
+                    log_progress(f"Warning: Could not remove existing file {file_path}: {e}", detail_level=3)
+                    
+    except OSError as e:
+        log_progress(f"Warning: Directory creation issue: {e}", detail_level=2)
 
     all_subset_indices_list: List[np.ndarray] = []
     all_complement_indices_list: List[np.ndarray] = []
@@ -389,8 +407,25 @@ def monte_carlo_subsampling(samples_array: np.ndarray,
         subset_data_arr = samples_array[subset_indices_arr]
         complement_data_arr = samples_array[complement_indices_arr]
 
-        np.save(os.path.join(subsamples_data_folder, f'subset_data_{B_idx_iter}.npy'), subset_data_arr)
-        np.save(os.path.join(subsamples_data_folder, f'complement_data_{B_idx_iter}.npy'), complement_data_arr)
+        # Save with error handling
+        try:
+            subset_file_path = os.path.join(subsamples_data_folder, f'subset_data_{B_idx_iter}.npy')
+            complement_file_path = os.path.join(subsamples_data_folder, f'complement_data_{B_idx_iter}.npy')
+            
+            np.save(subset_file_path, subset_data_arr)
+            np.save(complement_file_path, complement_data_arr)
+        except PermissionError as e:
+            log_progress(f"Permission error saving files for iteration {B_idx_iter}: {e}", detail_level=2)
+            # Try to fix permissions on the directory
+            try:
+                import stat
+                os.chmod(subsamples_data_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                np.save(subset_file_path, subset_data_arr)
+                np.save(complement_file_path, complement_data_arr)
+                log_progress(f"Successfully saved files after permission fix for iteration {B_idx_iter}", detail_level=3)
+            except Exception as retry_e:
+                log_progress(f"Failed to save files even after permission fix for iteration {B_idx_iter}: {retry_e}", detail_level=2)
+                raise
 
     np.save(os.path.join(indices_folder, 'all_train_indices.npy'), np.array(all_subset_indices_list, dtype=object))
     np.save(os.path.join(indices_folder, 'all_test_indices.npy'), np.array(all_complement_indices_list, dtype=object))
