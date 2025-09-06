@@ -1077,7 +1077,20 @@ def run_mcss_analysis(config_payload: Dict[str, Union[str, int]],
                 
                 log_progress(f"Required subsample files not found. Regenerating.", detail_level=2)
                 if os.path.exists(shared_subsample_loc):
-                    shutil.rmtree(shared_subsample_loc)
+                    try:
+                        shutil.rmtree(shared_subsample_loc)
+                    except OSError as e:
+                        log_progress(f"Warning: Could not remove directory {shared_subsample_loc}: {e}. Trying alternative cleanup.", detail_level=2)
+                        # Try to remove contents recursively with force
+                        import stat
+                        def handle_remove_readonly(func, path, exc):
+                            if os.path.exists(path):
+                                os.chmod(path, stat.S_IWRITE)
+                                func(path)
+                        try:
+                            shutil.rmtree(shared_subsample_loc, onerror=handle_remove_readonly)
+                        except OSError:
+                            log_progress(f"Warning: Could not completely remove {shared_subsample_loc}. Continuing with existing directory.", detail_level=2)
                 os.makedirs(shared_subsample_loc, exist_ok=True)
                 subsamples_loc_path, indices_loc_path = monte_carlo_subsampling(_samples_arr, _n_total, DEFAULT_CONFIG['B'], _n_train, shared_subsample_loc)
             else:
