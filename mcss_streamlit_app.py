@@ -427,8 +427,22 @@ def monte_carlo_subsampling(samples_array: np.ndarray,
                 log_progress(f"Failed to save files even after permission fix for iteration {B_idx_iter}: {retry_e}", detail_level=2)
                 raise
 
-    np.save(os.path.join(indices_folder, 'all_train_indices.npy'), np.array(all_subset_indices_list, dtype=object))
-    np.save(os.path.join(indices_folder, 'all_test_indices.npy'), np.array(all_complement_indices_list, dtype=object))
+    # Save index files with error handling
+    try:
+        np.save(os.path.join(indices_folder, 'all_train_indices.npy'), np.array(all_subset_indices_list, dtype=object))
+        np.save(os.path.join(indices_folder, 'all_test_indices.npy'), np.array(all_complement_indices_list, dtype=object))
+    except PermissionError as e:
+        log_progress(f"Permission error saving index files: {e}", detail_level=2)
+        # Try to fix permissions on the indices directory
+        try:
+            import stat
+            os.chmod(indices_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+            np.save(os.path.join(indices_folder, 'all_train_indices.npy'), np.array(all_subset_indices_list, dtype=object))
+            np.save(os.path.join(indices_folder, 'all_test_indices.npy'), np.array(all_complement_indices_list, dtype=object))
+            log_progress("Successfully saved index files after permission fix", detail_level=3)
+        except Exception as retry_e:
+            log_progress(f"Failed to save index files even after permission fix: {retry_e}", detail_level=2)
+            raise
 
     log_progress("Completed Monte Carlo subsampling")
     return subsamples_data_folder, indices_folder
