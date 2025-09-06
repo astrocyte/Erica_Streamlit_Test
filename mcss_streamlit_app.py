@@ -380,8 +380,8 @@ def monte_carlo_subsampling(samples_array: np.ndarray,
             log_progress(f"Subsampling iteration {B_idx_iter+1}/{num_iterations}", detail_level=2)
 
         current_indices = random.sample(range(num_samples), num_samples)
-        subset_indices_arr = np.array(current_indices[:subsample_size_train])
-        complement_indices_arr = np.array(current_indices[subsample_size_train:])
+        subset_indices_arr = np.array(current_indices[:subsample_size_train], dtype=int)
+        complement_indices_arr = np.array(current_indices[subsample_size_train:], dtype=int)
 
         all_subset_indices_list.append(subset_indices_arr)
         all_complement_indices_list.append(complement_indices_arr)
@@ -1251,17 +1251,24 @@ def main():
             
             run_button = st.button("▶ Run Analysis", type="primary", use_container_width=True, disabled=not uploaded_files)
             
-            # Placeholder for download button logic
-            if st.session_state.run_status['output_folders']:
+            # Download button - always visible but disabled when no results
+            has_results = bool(st.session_state.run_status['output_folders'])
+            
+            if has_results:
                 zip_data = create_results_zip(st.session_state.run_status['output_folders'])
                 if zip_data:
                     st.download_button(
-                        label="📥 Download Results",
+                        label="📥 Download Results ZIP",
                         data=zip_data,
                         file_name=f"mcss_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
                         mime="application/zip",
-                        use_container_width=True
+                        use_container_width=True,
+                        help=f"Download {len(st.session_state.run_status['output_folders'])} result folder(s) as a ZIP file"
                     )
+                else:
+                    st.button("📥 Download Results ZIP", disabled=True, use_container_width=True, help="Error creating download package")
+            else:
+                st.button("📥 Download Results ZIP", disabled=True, use_container_width=True, help="Run analysis first to generate results")
 
     # --- RUN LOGIC ---
     if run_button:
@@ -1298,6 +1305,22 @@ def main():
                 st.write("Analysis Complete. Output folders:")
                 for folder in st.session_state.run_status['output_folders']:
                     st.code(folder, language=None)
+                
+                # Add download button in results section
+                st.markdown("---")
+                zip_data = create_results_zip(st.session_state.run_status['output_folders'])
+                if zip_data:
+                    st.download_button(
+                        label="📥 Download All Results as ZIP",
+                        data=zip_data,
+                        file_name=f"mcss_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                    st.success(f"✅ {len(st.session_state.run_status['output_folders'])} result folder(s) ready for download!")
+                else:
+                    st.error("❌ Error creating download package")
             else:
                 st.info("Results will appear here after a successful run.")
     
